@@ -1,0 +1,89 @@
+# Name of project
+name: Build and Deploy
+
+on:
+  # Runs on pull requests targeting the default branch
+  pull_request:
+    branches: ["main", "staging", "prod"]
+    types: [opened, reopened, synchronize]
+
+  push:
+    branches: ["main", "staging", "prod"]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+  workflow_call:
+
+# Allow one concurrent deployment
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Dump GitHub context
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_CONTEXT: ${{ toJson(github) }}
+    steps:
+      - run: echo "$GITHUB_CONTEXT"
+
+  # Build job
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: This is a step
+        run: echo "This is a step"
+      - name: Debug Branch Info
+        run: |
+          echo "Current branch: ${{ github.ref }}"
+          echo "Event name: ${{ github.event_name }}"
+
+  get-pr:
+    name: PR
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v3
+      - uses: 8BitJonny/gh-get-current-pr@2.2.0
+        id: PR
+    outputs:
+      pr: ${{ steps.PR.outputs.pr }}
+      number: ${{ steps.PR.outputs.number }}
+
+  # Deploy preview job
+  deploy-preview:
+    name: Deploy Preview
+    runs-on: ubuntu-latest
+    needs: [build, get-pr]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: 8BitJonny/gh-get-current-pr@2.2.0
+        id: PR
+
+      - name: "Pull Request ${{ steps.PR.outputs.number }}"
+        if:
+        run: |
+          echo "from ${{ fromJSON(steps.PR.outputs.pr).head.ref }}"
+          echo "to ${{ fromJSON(steps.PR.outputs.pr).base.ref }}"
+      - name: Debug Branch Info
+        run: |
+          echo "Current branch: ${{ github.ref }}"
+          echo "Event name: ${{ github.event_name }}"
+
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v3
+      - name: This is a step
+        run: echo "This is a step"
+      - name: Debug Branch Info
+        run: |
+          echo "Current branch: ${{ github.ref }}"
+          echo "Event name: ${{ github.event_name }}"
